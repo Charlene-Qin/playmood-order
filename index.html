@@ -6,6 +6,7 @@
 <title>玩物智所｜產品採購單</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Microsoft JhengHei',Arial,sans-serif;background:#F2F2F2;color:#1A1A1A;font-size:13px}
@@ -159,7 +160,10 @@ body{font-family:'Microsoft JhengHei',Arial,sans-serif;background:#F2F2F2;color:
       <table class="rtable"><thead><tr><th>#</th><th>品名</th><th>規格</th><th>單位</th><th>單價</th><th>數量</th><th>小計</th><th>備註</th></tr></thead><tbody id="r-tbody"></tbody></table>
       <div class="rtotal"><span class="rtlbl">產品合計（未稅，不含待報價及其他需求項目）</span><span class="rtnum" id="r-total"></span></div>
       <div class="estatus" id="email-status"></div>
-      <div class="dlrow"><button class="dlbtn" onclick="dlPDF()">⬇ 下載 PDF 採購單</button></div>
+      <div class="dlrow">
+        <button class="dlbtn" onclick="dlPDF()">⬇ 下載 PDF 採購單</button>
+        <button class="dlbtn" onclick="dlIMG()" id="img-btn" style="background:#1A1A1A;color:#FFE600;border-color:#1A1A1A">📷 下載圖片</button>
+      </div>
       <button class="backbtn" onclick="closeResult()">← 返回修改採購單</button>
     </div>
   </div>
@@ -455,6 +459,35 @@ function dlPDF(){
   doc.addFileToVFS("MSJH-B.ttf",FONT_BOLD);doc.addFont("MSJH-B.ttf","MSJH","bold");
   buildPDFContent(doc,d);
   doc.save(`玩物智所採購單_${d.name}_${d.date.replace(/\//g,'')}.pdf`);
+}
+
+function dlIMG(){
+  const btn=document.getElementById('img-btn');
+  btn.textContent='⏳ 產生圖片中…';btn.disabled=true;
+  const target=document.querySelector('.rbox');
+  // Temporarily hide the buttons and back button while capturing
+  const dlrow=document.querySelector('.dlrow');
+  const backbtn=document.querySelector('.backbtn');
+  const estatus=document.getElementById('email-status');
+  dlrow.style.display='none';backbtn.style.display='none';
+  html2canvas(target,{
+    scale:2,
+    useCORS:true,
+    backgroundColor:'#ffffff',
+    logging:false
+  }).then(canvas=>{
+    dlrow.style.display='';backbtn.style.display='';
+    const d=orderData;
+    const link=document.createElement('a');
+    link.download=`玩物智所採購單_${d.name}_${d.date.replace(/\//g,'')}.png`;
+    link.href=canvas.toDataURL('image/png');
+    link.click();
+    btn.textContent='📷 下載圖片';btn.disabled=false;
+  }).catch(()=>{
+    dlrow.style.display='';backbtn.style.display='';
+    btn.textContent='📷 下載圖片';btn.disabled=false;
+    alert('圖片產生失敗，請改用 PDF 下載。');
+  });
 }
 
 init();
