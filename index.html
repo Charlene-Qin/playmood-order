@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>玩物智所｜產品採購單</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
 <style>
@@ -67,6 +66,19 @@ body{font-family:'Microsoft JhengHei',Arial,sans-serif;background:#F2F2F2;color:
 .tnote{font-size:10px;color:#444;margin-bottom:10px;line-height:1.5}
 .sbtn{width:100%;padding:11px;border:none;border-radius:5px;background:#FFE600;color:#1A1A1A;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
 .sbtn:hover{background:#EED800}
+/* Custom items section in cart */
+.custom-section{padding:10px 15px;border-top:1px solid #2A2A2A}
+.custom-title{font-size:11px;font-weight:700;color:#FFE600;margin-bottom:8px}
+.custom-row{display:flex;gap:6px;margin-bottom:6px;align-items:flex-start}
+.custom-name-inp{flex:1;padding:5px 7px;border:1.5px solid #333;border-radius:4px;font-size:11px;font-family:inherit;background:#1E1E1E;color:#DDD}
+.custom-name-inp:focus{outline:none;border-color:#FFE600}
+.custom-qty-inp{width:40px;padding:5px 4px;border:1.5px solid #333;border-radius:4px;font-size:11px;text-align:center;font-family:inherit;background:#1E1E1E;color:#DDD}
+.custom-qty-inp:focus{outline:none;border-color:#FFE600}
+.custom-del{width:22px;height:26px;border:none;background:transparent;color:#555;cursor:pointer;font-size:14px;flex-shrink:0;padding:0;display:flex;align-items:center;justify-content:center}
+.custom-del:hover{color:#FF4444}
+.add-custom-btn{width:100%;padding:6px;border:1.5px dashed #444;border-radius:4px;background:transparent;color:#888;font-size:11px;cursor:pointer;font-family:inherit;margin-bottom:8px}
+.add-custom-btn:hover{border-color:#FFE600;color:#FFE600}
+/* Result modal */
 #result{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;overflow-y:auto;padding:30px 16px}
 .rbox{background:#fff;border-radius:8px;max-width:760px;margin:0 auto;overflow:hidden}
 .rhdr{background:#FFE600;padding:20px 28px}.rhdr h2{font-size:20px;font-weight:900}.rhdr p{font-size:11px;color:#666;margin-top:3px}
@@ -80,9 +92,8 @@ body{font-family:'Microsoft JhengHei',Arial,sans-serif;background:#F2F2F2;color:
 .rtotal{display:flex;justify-content:space-between;align-items:baseline;padding:12px 0;border-top:2px solid #1A1A1A;margin-bottom:16px}
 .rtlbl{font-size:12px;color:#888}.rtnum{font-size:22px;font-weight:900}
 .dlrow{display:flex;gap:10px;margin-bottom:14px}
-.dlbtn{flex:1;padding:11px;border:2px solid #1A1A1A;border-radius:5px;background:#fff;cursor:pointer;font-size:12px;font-weight:700;text-align:center;font-family:inherit;transition:all .15s}
-.dlbtn:hover{background:#1A1A1A;color:#FFE600}.dlbtn.pri{background:#FFE600;border-color:#FFE600}
-.dlbtn.pri:hover{background:#EED800;color:#1A1A1A}
+.dlbtn{flex:1;padding:11px;border:2px solid #1A1A1A;border-radius:5px;background:#FFE600;border-color:#FFE600;cursor:pointer;font-size:13px;font-weight:700;text-align:center;font-family:inherit;transition:all .15s}
+.dlbtn:hover{background:#EED800}
 .estatus{border-radius:4px;padding:9px 14px;font-size:11px;text-align:center;margin-bottom:12px;display:none}
 .estatus.ok{background:#E1F5EE;border:1px solid #5DCAA5;color:#085041}
 .estatus.warn{background:#FFF8E1;border:1px solid #FFC107;color:#7A5C00}
@@ -97,7 +108,7 @@ body{font-family:'Microsoft JhengHei',Arial,sans-serif;background:#F2F2F2;color:
   .sidebar{width:100%;display:flex;flex-wrap:nowrap;overflow-x:auto;height:auto}
   .scat{border-bottom:none;border-right:1px solid #222;flex-shrink:0}
   .cart{width:100%}.info-grid{grid-template-columns:1fr 1fr}
-  .dlrow{flex-direction:column}.rinfo{grid-template-columns:1fr}
+  .rinfo{grid-column:1/-1}
 }
 </style>
 </head>
@@ -126,9 +137,15 @@ body{font-family:'Microsoft JhengHei',Arial,sans-serif;background:#F2F2F2;color:
     <div class="cart" id="cart-panel">
       <div class="cart-hdr"><div class="cart-title">已選品項</div><div class="cart-cnt" id="cart-cnt"></div></div>
       <div class="cart-body" id="cart-body"><div class="cempty">尚未選購任何品項</div></div>
+      <!-- Custom items section -->
+      <div class="custom-section">
+        <div class="custom-title">＋ 其他需求品項（不在價目表內）</div>
+        <div id="custom-rows"></div>
+        <button class="add-custom-btn" onclick="addCustomRow()">＋ 新增品項</button>
+      </div>
       <div class="cart-foot">
         <div class="trow"><span class="tlbl">產品小計（未稅）</span><span class="tnum" id="cart-total">$0</span></div>
-        <div class="tnote">安裝工資、軟體設定費及現場報價項目另計。</div>
+        <div class="tnote">安裝工資、軟體設定費及現場報價項目另計。其他需求品項另行報價。</div>
         <button class="sbtn" onclick="submitOrder()">確認送出並產生採購單 →</button>
       </div>
     </div>
@@ -140,12 +157,9 @@ body{font-family:'Microsoft JhengHei',Arial,sans-serif;background:#F2F2F2;color:
     <div class="rbody">
       <div class="rinfo" id="r-info"></div>
       <table class="rtable"><thead><tr><th>#</th><th>品名</th><th>規格</th><th>單位</th><th>單價</th><th>數量</th><th>小計</th><th>備註</th></tr></thead><tbody id="r-tbody"></tbody></table>
-      <div class="rtotal"><span class="rtlbl">產品合計（未稅，不含待報價項目）</span><span class="rtnum" id="r-total"></span></div>
+      <div class="rtotal"><span class="rtlbl">產品合計（未稅，不含待報價及其他需求項目）</span><span class="rtnum" id="r-total"></span></div>
       <div class="estatus" id="email-status"></div>
-      <div class="dlrow">
-        <button class="dlbtn pri" onclick="dlExcel()">⬇ 下載 Excel 採購單</button>
-        <button class="dlbtn" onclick="dlPDF()">⬇ 下載 PDF 採購單</button>
-      </div>
+      <div class="dlrow"><button class="dlbtn" onclick="dlPDF()">⬇ 下載 PDF 採購單</button></div>
       <button class="backbtn" onclick="closeResult()">← 返回修改採購單</button>
     </div>
   </div>
@@ -157,6 +171,7 @@ const FONT_BOLD="AAEAAAAVAQAABABQR0RFRgAQAg4AA8wIAAAAFkdQT1MAGQAMAAPMIAAAABBHU1V
 <script>
 let PRODUCTS=[],CAT_LABELS={},CATS_ORDER=[];
 let cart={},itemNotes={},tbdNotes={},curCat='',orderType='new',orderData=null;
+let customItems=[];
 
 async function init(){
   try{
@@ -167,13 +182,17 @@ async function init(){
     curCat=CATS_ORDER[0];
     document.getElementById('loading').style.display='none';
     document.getElementById('app').style.display='block';
-    buildSidebar();renderGrid();renderCart();
+    buildSidebar();renderGrid();renderCart();renderCustomRows();
   }catch(e){
     document.getElementById('loading').innerHTML='<h1 style="color:#FF4444">載入失敗</h1><p style="color:#888">請確認 products.json 在同一目錄</p>';
   }
 }
 
-function setType(t){orderType=t;document.getElementById('tb-new').classList.toggle('on',t==='new');document.getElementById('tb-add').classList.toggle('on',t==='add');}
+function setType(t){
+  orderType=t;
+  document.getElementById('tb-new').classList.toggle('on',t==='new');
+  document.getElementById('tb-add').classList.toggle('on',t==='add');
+}
 
 function buildSidebar(){
   document.getElementById('sidebar').innerHTML=CATS_ORDER.map(c=>{
@@ -209,23 +228,58 @@ function renderGrid(){
 }
 
 function chg(id,d){cart[id]=Math.max(0,(cart[id]||0)+d);renderGrid();buildSidebar();renderCart();}
-function setNote(id,v){itemNotes[id]=v;}function setTbd(id,v){tbdNotes[id]=v;}
+function setNote(id,v){itemNotes[id]=v;}
+function setTbd(id,v){tbdNotes[id]=v;}
+
+// ── Custom items ──
+function addCustomRow(){
+  customItems.push({id:Date.now(),name:'',qty:1});
+  renderCustomRows();
+  // Focus the new input
+  setTimeout(()=>{
+    const inputs=document.querySelectorAll('.custom-name-inp');
+    if(inputs.length) inputs[inputs.length-1].focus();
+  },50);
+}
+function removeCustomRow(id){
+  customItems=customItems.filter(c=>c.id!==id);
+  renderCustomRows();
+}
+function updateCustomName(id,v){
+  const c=customItems.find(c=>c.id===id);
+  if(c) c.name=v;
+}
+function updateCustomQty(id,v){
+  const c=customItems.find(c=>c.id===id);
+  if(c) c.qty=Math.max(1,parseInt(v)||1);
+}
+function renderCustomRows(){
+  document.getElementById('custom-rows').innerHTML=customItems.map(c=>`
+    <div class="custom-row">
+      <input class="custom-name-inp" placeholder="品項名稱（例：智能香薰機）" value="${c.name}" oninput="updateCustomName(${c.id},this.value)">
+      <input class="custom-qty-inp" type="number" min="1" value="${c.qty}" onchange="updateCustomQty(${c.id},this.value)">
+      <button class="custom-del" onclick="removeCustomRow(${c.id})">✕</button>
+    </div>`).join('');
+}
 
 function renderCart(){
   const sel=PRODUCTS.filter(p=>(cart[p.id]||0)>0);
   const body=document.getElementById('cart-body');
   const badge=document.getElementById('hdr-badge');
-  document.getElementById('cart-cnt').textContent=sel.length?`共 ${sel.length} 品項`:'';
-  document.getElementById('hdr-cnt').textContent=sel.length;
-  badge.style.display=sel.length?'block':'none';
+  const totalItems=sel.length+customItems.filter(c=>c.name.trim()).length;
+  document.getElementById('cart-cnt').textContent=totalItems?`共 ${totalItems} 品項`:'';
+  document.getElementById('hdr-cnt').textContent=totalItems;
+  badge.style.display=totalItems?'block':'none';
   if(!sel.length){body.innerHTML='<div class="cempty">尚未選購任何品項</div>';document.getElementById('cart-total').textContent='$0';return;}
   let total=0;
   body.innerHTML=sel.map(p=>{
     const q=cart[p.id],lt=p.price?p.price*q:null;if(lt)total+=lt;
     const n=itemNotes[p.id]||'',tn=tbdNotes[p.id]||'';
-    return `<div class="ci"><div class="ciname">${p.name} <span class="ciqty">×${q}</span></div>
+    return `<div class="ci">
+      <div class="ciname">${p.name} <span class="ciqty">×${q}</span></div>
       ${n?`<div class="cinote">備註：${n}</div>`:''}${tn?`<div class="cinote">需求：${tn}</div>`:''}
-      <div class="cirow"><span class="ciprice">${lt?'$'+lt.toLocaleString():'待報價'}</span><span class="cidel" onclick="rmv(${p.id})">✕ 移除</span></div></div>`;
+      <div class="cirow"><span class="ciprice">${lt?'$'+lt.toLocaleString():'待報價'}</span><span class="cidel" onclick="rmv(${p.id})">✕ 移除</span></div>
+    </div>`;
   }).join('');
   document.getElementById('cart-total').textContent='$'+total.toLocaleString()+(sel.some(p=>p.tbd)?'+待報':'');
 }
@@ -236,7 +290,8 @@ function submitOrder(){
   const name=document.getElementById('f-name').value.trim();
   if(!name){alert('請填寫採購人姓名');return;}
   const sel=PRODUCTS.filter(p=>(cart[p.id]||0)>0);
-  if(!sel.length){alert('請先選購品項');return;}
+  const validCustom=customItems.filter(c=>c.name.trim());
+  if(!sel.length&&!validCustom.length){alert('請先選購品項或填寫其他需求');return;}
   const contact=document.getElementById('f-contact').value.trim();
   const project=document.getElementById('f-project').value.trim();
   const note=document.getElementById('f-note').value.trim();
@@ -246,15 +301,28 @@ function submitOrder(){
     const q=cart[p.id],lt=p.price?p.price*q:null;if(lt)total+=lt;
     return{name:p.name,spec:p.spec,unit:p.unit,proto:p.proto,price:p.price,qty:q,subtotal:lt,tbd:p.tbd,cat:p.cat,note:itemNotes[p.id]||'',tbdNote:tbdNotes[p.id]||''};
   });
-  orderData={name,contact,project,note,date,orderType,items,total};
+  orderData={name,contact,project,note,date,orderType,items,total,customItems:validCustom};
   showResult();sendEmail();
 }
 
 function showResult(){
   const d=orderData;
   document.getElementById('r-sub').textContent=`${d.date}｜${d.orderType==='new'?'首次採購':'追加採購'}`;
-  document.getElementById('r-info').innerHTML=`<div class="ri"><b>採購人</b>${d.name}</div><div class="ri"><b>聯絡</b>${d.contact||'-'}</div><div class="ri"><b>案件</b>${d.project||'-'}</div><div class="ri"><b>備註</b>${d.note||'-'}</div>`;
-  document.getElementById('r-tbody').innerHTML=d.items.map((it,i)=>`<tr><td style="color:#AAA">${i+1}</td><td>${it.name}</td><td style="font-size:10px;color:#999">${it.spec}</td><td>${it.unit}</td><td>${it.tbd?'待報價':'$'+it.price.toLocaleString()}</td><td style="text-align:center">${it.qty}</td><td>${it.subtotal?'$'+it.subtotal.toLocaleString():'待報價'}</td><td style="font-size:10px;color:#999">${it.note||it.tbdNote||''}</td></tr>`).join('');
+  document.getElementById('r-info').innerHTML=`
+    <div class="ri"><b>採購人</b>${d.name}</div><div class="ri"><b>聯絡</b>${d.contact||'-'}</div>
+    <div class="ri"><b>案件</b>${d.project||'-'}</div><div class="ri"><b>備註</b>${d.note||'-'}</div>`;
+  let rows=d.items.map((it,i)=>`<tr>
+    <td style="color:#AAA">${i+1}</td><td>${it.name}</td>
+    <td style="font-size:10px;color:#999">${it.spec}</td><td>${it.unit}</td>
+    <td>${it.tbd?'待報價':'$'+it.price.toLocaleString()}</td>
+    <td style="text-align:center">${it.qty}</td>
+    <td>${it.subtotal?'$'+it.subtotal.toLocaleString():'待報價'}</td>
+    <td style="font-size:10px;color:#999">${it.note||it.tbdNote||''}</td></tr>`).join('');
+  if(d.customItems&&d.customItems.length){
+    rows+=`<tr><td colspan="8" style="background:#FFF8E1;color:#7A5C00;font-weight:700;font-size:10px;padding:6px 9px">其他需求品項（另行報價）</td></tr>`;
+    d.customItems.forEach((c,i)=>{rows+=`<tr><td style="color:#AAA">${d.items.length+i+1}</td><td colspan="5">${c.name}</td><td style="text-align:center">${c.qty}</td><td style="font-size:10px;color:#999">另行報價</td></tr>`;});
+  }
+  document.getElementById('r-tbody').innerHTML=rows;
   document.getElementById('r-total').textContent='$'+d.total.toLocaleString()+(d.items.some(i=>i.tbd)?'＋待報':'');
   document.getElementById('email-status').style.display='none';
   document.getElementById('result').style.display='block';
@@ -264,7 +332,15 @@ function closeResult(){document.getElementById('result').style.display='none';}
 function sendEmail(){
   const d=orderData;
   let body=`【玩物智所採購單】\n採購人：${d.name}　聯絡：${d.contact||'未填'}\n案件：${d.project||'未填'}　類型：${d.orderType==='new'?'首次採購':'追加採購'}\n備註：${d.note||'無'}\n${'-'.repeat(30)}\n`;
-  d.items.forEach(it=>{body+=`• ${it.name} ×${it.qty}　${it.subtotal?'$'+it.subtotal.toLocaleString():'待報價'}\n`;if(it.note)body+=`  備註：${it.note}\n`;if(it.tbdNote)body+=`  需求：${it.tbdNote}\n`;});
+  d.items.forEach(it=>{
+    body+=`• ${it.name} ×${it.qty}　${it.subtotal?'$'+it.subtotal.toLocaleString():'待報價'}\n`;
+    if(it.note)body+=`  備註：${it.note}\n`;
+    if(it.tbdNote)body+=`  需求：${it.tbdNote}\n`;
+  });
+  if(d.customItems&&d.customItems.length){
+    body+=`\n【其他需求品項（另行報價）】\n`;
+    d.customItems.forEach(c=>{body+=`• ${c.name} ×${c.qty}\n`;});
+  }
   body+=`${'-'.repeat(30)}\n合計：$${d.total.toLocaleString()}${d.items.some(i=>i.tbd)?'＋待報':''}`;
   const fd=new FormData();
   fd.append('name',d.name);fd.append('email','service@playmood.com.tw');
@@ -276,29 +352,7 @@ function sendEmail(){
 function showEmailStatus(ok){
   const el=document.getElementById('email-status');el.style.display='block';
   if(ok){el.className='estatus ok';el.textContent='✓ 採購單摘要已寄送至 service@playmood.com.tw 備份';}
-  else{el.className='estatus warn';el.textContent='提醒：郵件備份未成功，請下載 PDF 或 Excel 自行儲存。';}
-}
-
-function dlExcel(){
-  const d=orderData,WB=XLSX.utils.book_new();
-  const rows=[['玩物智所 Playmood Studio｜產品採購單','','','','','','','',''],['','','','','','','','',''],
-    ['採購人：'+d.name,'','','聯絡方式：'+(d.contact||'-'),'','','案件：'+(d.project||'-'),'',''],
-    ['採購日期：'+d.date,'','','採購類型：'+(d.orderType==='new'?'首次採購':'追加採購'),'','','備註：'+(d.note||'-'),'',''],
-    ['','','','','','','','',''],['#','品名','規格','連接協議','單位','單價(未稅)','數量','小計','備註／規格說明']];
-  CATS_ORDER.forEach(cat=>{
-    const ci=d.items.filter(it=>it.cat===cat);if(!ci.length)return;
-    rows.push([CAT_LABELS[cat],'','','','','','','','']);
-    ci.forEach((it,i)=>rows.push([i+1,it.name,it.spec,it.proto||'-',it.unit,it.tbd?'待報價':it.price,it.qty,it.subtotal||'待報價',it.note||it.tbdNote||'']));
-  });
-  rows.push(['','','','','','','','','']);
-  rows.push(['','','','','','產品合計（未稅）','','$'+d.total.toLocaleString()+(d.items.some(i=>i.tbd)?'＋待報':''),'']);
-  rows.push(['','','','','','','','','']);
-  rows.push(['※ 安裝工資、軟體設定費及需洽談之項目另計。「待報價」請於備註欄說明需求，由玩物智所另行報價。','','','','','','','','']);
-  rows.push(['客戶確認簽名：________________________　　日期：__________　　玩物智所確認：________________________','','','','','','','','']);
-  const WS=XLSX.utils.aoa_to_sheet(rows);
-  WS['!cols']=[{wch:4},{wch:38},{wch:14},{wch:10},{wch:6},{wch:12},{wch:6},{wch:14},{wch:28}];
-  XLSX.utils.book_append_sheet(WB,WS,'採購單');
-  XLSX.writeFile(WB,`玩物智所採購單_${d.name}_${d.date.replace(/\//g,'')}.xlsx`);
+  else{el.className='estatus warn';el.textContent='提醒：郵件備份未成功，請下載 PDF 自行儲存。';}
 }
 
 function dlPDF(){
@@ -307,32 +361,61 @@ function dlPDF(){
   doc.addFileToVFS("MSJH-R.ttf",FONT_REG);doc.addFont("MSJH-R.ttf","MSJH","normal");
   doc.addFileToVFS("MSJH-B.ttf",FONT_BOLD);doc.addFont("MSJH-B.ttf","MSJH","bold");
   const sf=(b,sz,r,g,bv)=>{doc.setFont("MSJH",b?"bold":"normal");doc.setFontSize(sz);doc.setTextColor(r??26,g??26,bv??26);};
+
+  // Header
   doc.setFillColor(255,230,0);doc.rect(0,0,210,28,'F');
   sf(true,16);doc.text('玩物智所 Playmood Studio｜產品採購單',14,13);
   sf(false,8,100,100,100);doc.text('www.playmood.com.tw   service@playmood.com.tw',14,21);
+
+  // Info block
   let y=35;
-  [['採購人',d.name,'聯絡方式',d.contact||'-'],['案件名稱',d.project||'-','採購日期',d.date],['採購類型',d.orderType==='new'?'首次採購':'追加採購','備　　註',d.note||'-']].forEach(r=>{
+  [['採購人',d.name,'聯絡方式',d.contact||'-'],
+   ['案件名稱',d.project||'-','採購日期',d.date],
+   ['採購類型',d.orderType==='new'?'首次採購':'追加採購','備　　註',d.note||'-']
+  ].forEach(r=>{
     sf(true,8,120,120,120);doc.text(r[0]+'：',14,y);sf(false,9);doc.text(String(r[1]).substring(0,28),40,y);
     sf(true,8,120,120,120);doc.text(r[2]+'：',112,y);sf(false,9);doc.text(String(r[3]).substring(0,22),134,y);y+=5.5;
   });y+=3;
+
+  // Table body grouped by category
   const tb=[];
   CATS_ORDER.forEach(cat=>{
     const ci=d.items.filter(it=>it.cat===cat);if(!ci.length)return;
     tb.push([{content:CAT_LABELS[cat],colSpan:8,styles:{fillColor:[255,230,0],textColor:[26,26,26],fontStyle:'bold',font:'MSJH'}}]);
     ci.forEach((it,i)=>tb.push([i+1,it.name.substring(0,30),it.spec.substring(0,14),it.unit,it.tbd?'待報價':'$'+it.price.toLocaleString(),it.qty,it.subtotal?'$'+it.subtotal.toLocaleString():'待報價',(it.note||it.tbdNote||'').substring(0,18)]));
   });
-  doc.autoTable({startY:y,head:[['#','品名','規格','單位','單價','數量','小計','備註']],body:tb,
+
+  // Custom items section
+  if(d.customItems&&d.customItems.length){
+    tb.push([{content:'其他需求品項（另行報價）',colSpan:8,styles:{fillColor:[255,248,225],textColor:[122,92,0],fontStyle:'bold',font:'MSJH'}}]);
+    d.customItems.forEach((c,i)=>tb.push([d.items.length+i+1,c.name,'-','-','另行報價',c.qty,'另行報價','']));
+  }
+
+  doc.autoTable({
+    startY:y,
+    head:[['#','品名','規格','單位','單價','數量','小計','備註']],
+    body:tb,
     styles:{fontSize:7.5,cellPadding:2,font:'MSJH',overflow:'linebreak'},
     headStyles:{fillColor:[26,26,26],textColor:[255,230,0],fontStyle:'bold',font:'MSJH',fontSize:8},
     alternateRowStyles:{fillColor:[248,248,248]},
     columnStyles:{0:{cellWidth:8,halign:'center'},1:{cellWidth:52},2:{cellWidth:22},3:{cellWidth:10,halign:'center'},4:{cellWidth:18,halign:'right'},5:{cellWidth:10,halign:'center'},6:{cellWidth:20,halign:'right'},7:{cellWidth:36}},
-    margin:{left:14,right:14}});
+    margin:{left:14,right:14}
+  });
+
+  // Total bar
   const fy=doc.lastAutoTable.finalY+6;
   doc.setFillColor(255,230,0);doc.rect(14,fy-3.5,182,10,'F');
-  sf(true,9);doc.text('產品合計（未稅，不含待報價項目）',16,fy+2.5);
+  sf(true,9);doc.text('產品合計（未稅，不含待報價及其他需求項目）',16,fy+2.5);
   doc.text('$'+d.total.toLocaleString()+(d.items.some(i=>i.tbd)?'＋待報':''),196,fy+2.5,{align:'right'});
-  sf(false,7,150,150,150);doc.text('※ 安裝工資、軟體設定費及需洽談之項目另計。「待報價」欄位請於備註欄說明需求，由玩物智所另行報價。',14,fy+16);
-  sf(false,8,26,26,26);doc.text('客戶確認簽名：________________________　　日期：__________　　玩物智所確認：________________________',14,fy+25);
+
+  // Footer note
+  sf(false,7,150,150,150);
+  doc.text('※ 安裝工資、軟體設定費及需洽談之項目另計。「待報價」及「其他需求品項」由玩物智所另行報價。',14,fy+16);
+
+  // Confirmation line (no customer signature, only Playmood + date)
+  sf(false,8,26,26,26);
+  doc.text('玩物智所確認：________________________　　日期：__________',14,fy+26);
+
   doc.save(`玩物智所採購單_${d.name}_${d.date.replace(/\//g,'')}.pdf`);
 }
 
