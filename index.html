@@ -195,12 +195,15 @@ function setType(t){
 }
 
 function buildSidebar(){
-  document.getElementById('sidebar').innerHTML=CATS_ORDER.map(c=>{
+  const catBtns=CATS_ORDER.map(c=>{
     const cnt=PRODUCTS.filter(p=>p.cat===c&&(cart[p.id]||0)>0).length;
     return `<button class="scat${c===curCat?' on':''}" onclick="switchCat('${c}')">${CAT_LABELS[c]}${cnt?`<span class="badge">${cnt}</span>`:''}</button>`;
   }).join('');
+  const customCnt=customItems.filter(c=>c.name.trim()).length;
+  const customBtn=`<button class="scat${curCat==='__custom__'?' on':''}" onclick="switchCat('__custom__')" style="color:${curCat==='__custom__'?'#1A1A1A':'#FFE600'};${curCat!=='__custom__'?'background:#2A2A2A;':''}">${curCat==='__custom__'?'':'✦ '}其他需求${customCnt?`<span class="badge" style="${curCat==='__custom__'?'background:#1A1A1A;color:#FFE600':'background:#FFE600;color:#1A1A1A'}">${customCnt}</span>`:''}</button>`;
+  document.getElementById('sidebar').innerHTML=catBtns+customBtn;
 }
-function switchCat(id){curCat=id;buildSidebar();renderGrid();}
+function switchCat(id){curCat=id;buildSidebar();if(id==='__custom__')renderCustomPage();else renderGrid();}
 
 function renderGrid(){
   const prods=PRODUCTS.filter(p=>p.cat===curCat);
@@ -232,18 +235,45 @@ function setNote(id,v){itemNotes[id]=v;}
 function setTbd(id,v){tbdNotes[id]=v;}
 
 // ── Custom items ──
+function renderCustomPage(){
+  document.getElementById('pgrid').innerHTML=`
+    <div style="grid-column:1/-1;background:#fff;border-radius:8px;border:1.5px solid #E8E8E8;padding:20px">
+      <div style="font-size:14px;font-weight:700;margin-bottom:6px;color:#1A1A1A">其他需求品項</div>
+      <div style="font-size:12px;color:#888;margin-bottom:16px">填寫不在價目表內的需求品項，送出後由玩物智所另行報價。</div>
+      <div id="custom-rows-main"></div>
+      <button class="add-custom-btn" style="background:#F5F5F5;border-color:#CCC;color:#555;width:auto;padding:8px 20px;margin-top:4px" onclick="addCustomRow()">＋ 新增品項</button>
+    </div>`;
+  renderCustomRowsMain();
+}
+function renderCustomRowsMain(){
+  const el=document.getElementById('custom-rows-main');
+  if(!el) return;
+  if(!customItems.length){el.innerHTML='<div style="color:#BBB;font-size:12px;padding:12px 0 8px">尚未新增任何需求品項</div>';return;}
+  el.innerHTML=customItems.map(c=>`
+    <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
+      <input style="flex:1;padding:8px 10px;border:1.5px solid #DDD;border-radius:4px;font-size:13px;font-family:inherit;background:#FAFAFA" placeholder="品項名稱（例：智能香薰機）" value="${c.name}" oninput="updateCustomName(${c.id},this.value)">
+      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+        <span style="font-size:11px;color:#888">數量</span>
+        <input style="width:50px;padding:8px 6px;border:1.5px solid #DDD;border-radius:4px;font-size:13px;text-align:center;font-family:inherit;background:#FAFAFA" type="number" min="1" value="${c.qty}" onchange="updateCustomQty(${c.id},this.value)">
+      </div>
+      <button style="padding:6px 10px;border:1.5px solid #EEE;border-radius:4px;background:#fff;cursor:pointer;color:#BBB;font-size:13px" onclick="removeCustomRowAndRefresh(${c.id})">✕</button>
+    </div>`).join('');
+}
+function removeCustomRowAndRefresh(id){
+  customItems=customItems.filter(c=>c.id!==id);
+  renderCustomRows();renderCustomRowsMain();renderCart();buildSidebar();
+}
 function addCustomRow(){
   customItems.push({id:Date.now(),name:'',qty:1});
-  renderCustomRows();
-  // Focus the new input
+  renderCustomRows();renderCustomRowsMain();renderCart();buildSidebar();
   setTimeout(()=>{
-    const inputs=document.querySelectorAll('.custom-name-inp');
+    const inputs=[...document.querySelectorAll('.custom-name-inp')];
     if(inputs.length) inputs[inputs.length-1].focus();
   },50);
 }
 function removeCustomRow(id){
   customItems=customItems.filter(c=>c.id!==id);
-  renderCustomRows();
+  renderCustomRows();renderCustomRowsMain();renderCart();buildSidebar();
 }
 function updateCustomName(id,v){
   const c=customItems.find(c=>c.id===id);
@@ -367,14 +397,38 @@ function dlPDF(){
   sf(true,16);doc.text('玩物智所 Playmood Studio｜產品採購單',14,13);
   sf(false,8,100,100,100);doc.text('www.playmood.com.tw   service@playmood.com.tw',14,21);
 
+  // Helper: convert full-width chars to half-width
+  const toHalf=s=>String(s).replace(/[\uFF01-\uFF5E]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/\u3000/g,' ');
+  // Helper: wrap long text to fit within maxWidth mm, return array of lines
+  const wrapText=(text,maxW,fontSize)=>{
+    const chars=[...toHalf(text)];
+    // Estimate: each char ~fontSize*0.53pt wide, 1pt=0.353mm
+    const charW=fontSize*0.53*0.353;
+    const charsPerLine=Math.floor(maxW/charW);
+    if(chars.length<=charsPerLine) return [chars.join('')];
+    const lines=[];
+    for(let i=0;i<chars.length;i+=charsPerLine) lines.push(chars.slice(i,i+charsPerLine).join(''));
+    return lines;
+  };
+
   // Info block
   let y=35;
-  [['採購人',d.name,'聯絡方式',d.contact||'-'],
-   ['案件名稱',d.project||'-','採購日期',d.date],
-   ['採購類型',d.orderType==='new'?'首次採購':'追加採購','備　　註',d.note||'-']
-  ].forEach(r=>{
-    sf(true,8,120,120,120);doc.text(r[0]+'：',14,y);sf(false,9);doc.text(String(r[1]).substring(0,28),40,y);
-    sf(true,8,120,120,120);doc.text(r[2]+'：',112,y);sf(false,9);doc.text(String(r[3]).substring(0,22),134,y);y+=5.5;
+  const infoRows=[
+    ['採購人',toHalf(d.name),'聯絡方式',toHalf(d.contact||'-')],
+    ['案件名稱',toHalf(d.project||'-'),'採購日期',d.date],
+    ['採購類型',d.orderType==='new'?'首次採購':'追加採購','備　　註',toHalf(d.note||'-')]
+  ];
+  infoRows.forEach(r=>{
+    const leftLines=wrapText(r[1],64,9);
+    const rightLines=wrapText(r[3],56,9);
+    const lineCount=Math.max(leftLines.length,rightLines.length);
+    sf(true,8,120,120,120);doc.text(r[0]+'：',14,y);
+    sf(false,9);
+    leftLines.forEach((ln,i)=>doc.text(ln,40,y+i*4));
+    sf(true,8,120,120,120);doc.text(r[2]+'：',112,y);
+    sf(false,9);
+    rightLines.forEach((ln,i)=>doc.text(ln,134,y+i*4));
+    y+=Math.max(5.5,lineCount*4+1);
   });y+=3;
 
   // Table body grouped by category
@@ -382,7 +436,7 @@ function dlPDF(){
   CATS_ORDER.forEach(cat=>{
     const ci=d.items.filter(it=>it.cat===cat);if(!ci.length)return;
     tb.push([{content:CAT_LABELS[cat],colSpan:8,styles:{fillColor:[255,230,0],textColor:[26,26,26],fontStyle:'bold',font:'MSJH'}}]);
-    ci.forEach((it,i)=>tb.push([i+1,it.name.substring(0,30),it.spec.substring(0,14),it.unit,it.tbd?'待報價':'$'+it.price.toLocaleString(),it.qty,it.subtotal?'$'+it.subtotal.toLocaleString():'待報價',(it.note||it.tbdNote||'').substring(0,18)]));
+    ci.forEach((it,i)=>tb.push([i+1,it.name,it.spec,it.unit,it.tbd?'待報價':'$'+it.price.toLocaleString(),it.qty,it.subtotal?'$'+it.subtotal.toLocaleString():'待報價',toHalf(it.note||it.tbdNote||'')]));
   });
 
   // Custom items section
